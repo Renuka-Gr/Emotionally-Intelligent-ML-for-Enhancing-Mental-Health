@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Depression Questionnaire with Emotion Detection</title>
+    <style>
+        /* Style for the webcam video feed */
+        #webcam {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            width: 320px;
+            height: 240px;
+            border: 2px solid black;
+            background-color: black;
+        }
+
+        /* Style for the form and other elements */
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1, h3 {
+            text-align: center;
+        }
+
+        form {
+            width: 80%;
+            margin: 0 auto;
+        }
+
+        div {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .submit-btn {
+            display: block;
+            width: 100%;
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+
+        .submit-btn:hover {
+            background-color: #45a049;
+        }
+
+        #emotionStatus {
+            text-align: center;
+            font-size: 18px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Depression Questionnaire</h1>
+    
+    <form method="POST" id="questionnaireForm">
+        {% for i, question in enumerate(questions) %}
+            <div>
+                <p>{{ question }}</p>
+                {% for option, value in answer_map.items() %}
+                    <label>
+                        <input type="radio" name="q{{ i }}" value="{{ value }}" required>
+                        {{ option }}
+                    </label><br>
+                {% endfor %}
+            </div>
+            <hr>
+        {% endfor %}
+        <button type="submit" class="submit-btn">Submit</button>
+    </form>
+    
+
+    <!-- Webcam Video Feed -->
+    <video id="webcam" autoplay></video>
+
+    <script>
+        // Start video stream and emotion detection
+        let emotion = "Analyzing...";
+        
+        function startWebcam() {
+            const videoElement = document.getElementById("webcam");
+            
+            const constraints = {
+                video: {
+                    facingMode: "user",
+                    width: { ideal: 640 },
+                    height: { ideal: 480 }
+                }
+            };
+
+            navigator.mediaDevices.getUserMedia(constraints)
+                .then((stream) => {
+                    videoElement.srcObject = stream;
+                    sendFrame(videoElement);
+                })
+                .catch((err) => {
+                    console.error("Error accessing webcam: ", err);
+                });
+        }
+
+        function sendFrame(videoElement) {
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d");
+            canvas.width = 640;
+            canvas.height = 480;
+
+            setInterval(() => {
+                ctx.drawImage(videoElement, 0, 0, 640, 480);
+                const dataUrl = canvas.toDataURL("image/png");
+
+                // Send frame to Flask for emotion detection
+                fetch("/detect_emotion", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ image: dataUrl })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    emotion = data.dominant_emotion;
+                    document.getElementById("currentEmotion").innerText = emotion;
+                })
+                .catch(error => {
+                    console.error("Error sending frame: ", error);
+                });
+            }, 1000);  // Send frame every second
+        }
+
+        // Start webcam when the page loads
+        window.onload = startWebcam;
+    </script>
+</body>
+</html>
